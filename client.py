@@ -1,8 +1,6 @@
 # Imports
 import os
 import socket
-import threading
-
 
 def check_user_input(user_input):
     if user_input != "":
@@ -10,30 +8,9 @@ def check_user_input(user_input):
     return False
 
 
-def is_alive(keep_alive_socket):
-    while True:
-        keep_alive_data = keep_alive_socket.recv(1024).decode("utf-8")
-        if keep_alive_data == "Connected...":
-            keep_alive_socket.send(bytes("Received...", "utf-8"))
-        elif keep_alive_data == "Connection to remote expired":
-            print(keep_alive_data)
-            keep_alive_socket.shutdown(socket.SHUT_RDWR)
-            keep_alive_socket.close()
-            break
-    s.shutdown(socket.SHUT_RDWR)
-    s.close()
-    exit(0)
-
-
 # Defining out socket object
 s = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
-s.connect(('10.0.0.19', 2222))
-
-keep_alive = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
-keep_alive.connect(('10.0.0.19', 3333))
-
-thread2 = threading.Thread(target=is_alive, args=(keep_alive, ), daemon=True)
-thread2.start()
+s.connect(('10.0.0.32', 2222))
 
 screen_shot_count = 0
 
@@ -42,7 +19,7 @@ while True:
         data = s.recv(1024).decode("utf-8")
         if not data:
             break
-        if data == "Bye bye!" or data == "You did not enter correct information" or data == "Bad Connection Parameters":
+        if data == "You did not enter correct information" or data == "Bad Connection Parameters":
             print(data)
             s.shutdown(socket.SHUT_RDWR)
             s.close()
