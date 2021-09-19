@@ -11,22 +11,24 @@ def close_connection(server):
     server.close()
     quit()
 
-# List the files included in the given path
-def show_folder_content(path):
+# Return the files included in the given path, otherwise return None
+def show_folder_content(path, server):
     try:
-        return os.listdir(path)
+        for item in os.listdir(path):
+            server.send(bytes(f'{item}\n', 'utf-8'))
     except OSError:
-        return "An error has occurred trying to open the folder"
+        server.send(bytes('An error has occurred\n', 'utf-8'))
+        return None
 
 
-# Open a file, given the file path
-def open_file(file_path):
+# Try to open a file given the file path
+def open_file(file_path, server):
     try:
         file = open(file_path, "r")
         file.close()
-        return "The server has successfully opened the file!"
+        server.send(bytes('The server has successfully opened the file\n', 'utf-8'))
     except OSError:
-        return "An error has occurred trying to open the file"
+        server.send(bytes('An error has occurred\n', 'utf-8'))
 
 
 # Send the commands to the connected client
@@ -37,23 +39,23 @@ def command_menu(server):
     'name' - Returns the server's name
     'exit' - Closes the connection to the server
     'screen_shot' - The server takes a screen shot and send it
-    'open {path}' - The server tries to open the software and returns if it 
-    was a success or a failure
+    'open {path}' - The server tries to open the software and returns if it was a success or a failure
     'show {folder path}' - The server returns the contents of the specified folder
-    """, "utf-8"))
+    """, 'utf-8'))
 
 
-# Register a new user, writing the credentials in usernames.txt
-def register_user(username, password):
+# Register a new user, write the credentials in usernames.txt
+def register_user(username, password, server):
     try:
         f = open(os.getcwd() + './usernames.txt', 'a+')
         f.write(f"{username} {password}\n")
         f.close()
+        server.send(bytes('User has successfully registered', 'utf-8'))
     except OSError as e:
-        print(e.strerror)
+        server.send(bytes('An error has occurred\n', 'utf-8'))
 
 
-# Check if the user us connecting or registering and returns the data
+# Check if the user is connecting or registering and returns the data
 def get_user_input(user_input, server):
     err = False
     data = {
@@ -74,31 +76,33 @@ def get_user_input(user_input, server):
             return data
         else:
             err = True
+    else:
+        err = True
     if err:
-        server.send(bytes("You did not enter credentials in the correct format\n", "utf-8"))
-        close_connection(server)
+        server.send(bytes("Credentials are not in the correct format\n", "utf-8"))
 
 
 # Check if the given credentials are correct as written in the usernames.txt file
-def check_credentials(username, password):
+def check_credentials(username, password, server):
     try:
         f = open(os.getcwd() + './usernames.txt', 'r')
         lines = f.readlines()
         for line in lines:
             if line.split()[0] == username and line.split()[1] == password:
                 f.close()
+                server.send(bytes('Credentials are correct\n', 'utf-8'))
                 return True
         f.close()
         return False
-    except OSError as e:
-        print(f"Error: {e.strerror}")
+    except OSError:
+        server.send(bytes('An error has occurred\n', 'utf-8'))
 
 # Main function which handle the user input and call other function accordingly
 def handle_connection(this_socket):
     # Getting user credentials
     this_socket.send(bytes("""
     Welcome to the server!
-    Please enter Username and Password using the following Syntax's:
+    Please enter Username and Password using the following Syntax:
     For Connection: 'connect: {username} {password}'
     For Registration: 'register: {username} {password}'
     """, 'utf-8'))
@@ -112,80 +116,51 @@ def handle_connection(this_socket):
     # If the user wish to connect
     if user_credentials['type'] == "connect":
         # Check if the user credentials are correct
-        if check_credentials(user_credentials['credentials'][0].strip(), user_credentials['credentials'][1].strip()):
+        if check_credentials(user_credentials['credentials'][0].strip(), user_credentials['credentials'][1].strip(), this_socket):
             this_socket.send(bytes("Connection successful, you're logged in", "utf-8"))
         else:
-            this_socket.send(bytes("Your credentials are wrong, please try again", "utf-8"))
-            close_connection(this_socket)
+            this_socket.send(bytes("Your credentials are incorrect, please try again", "utf-8"))
     elif user_credentials['type'] == 'register':
-        register_user(user_credentials['credentials'][0], user_credentials['credentials'][1])
-        this_socket.send(
-            bytes("User has been registered successfully!\n", "utf-8"))
-    else:
-        close_connection(this_socket)
+        register_user(user_credentials['credentials'][0].strip(), user_credentials['credentials'][1].strip(), this_socket)
 
     # Show commands to client and get user input
     command_menu(this_socket)
     user_input = this_socket.recv(1024).decode("utf-8")  
 
-    screen_shot_count = 0
-
     while True:
         if user_input == "time":
             today = date.today().strftime("%d/%m/%Y")
             current_time = datetime.now().strftime("%H:%M:%S")
-            this_socket.send(bytes(f"Today's date: {today}.\n"
+            this_socket.send(bytes(f"Today's date: {today}\n"
                                    f"Current time: {current_time}\n", "utf-8"))
-        if user_input == "name":
+        elif user_input == "name":
             this_socket.send(bytes(f"Peer name: {this_socket.getpeername()}\n"
                                    f"Socket name: {this_socket.getsockname()}\n"
                                    f"Platform name: {platform.uname()[1]}\n", "utf-8"))
-        if user_input == "exit":
+        elif user_input == "exit":
             close_connection(this_socket)
-            break
-        if user_input == "screen_show":
-            this_socket.send(bytes("Sending screen shot...", "utf-8"))
+        elif user_input == "screen_shot":
             # Check if the directory exists, otherwise creates it
             if not os.path.isdir("./screen_shots"):
                 os.mkdir("./screen_shots")
             pic = pyautogui.screenshot()
-            # Saves the screen shot
-            pic.save(f"./screen_shots/screen_shot_{screen_shot_count}.png")
-            pic.show()
+            # Save the screen shot
+            pic.save("./screen_shots/screen_shot.png")
             # Opens the screen shot and reads it
-            img = open(f"./screen_shots/screen_shot_{screen_shot_count}.png", "rb")
+            img = open(f"./screen_shots/screen_shot.png", "rb")
             image_user_input = img.read()
-            image_size = len(image_user_input)
-            # Sends the client the image size
-            this_socket.send(bytes(f"Size {image_size}", "utf-8"))
-            answer = this_socket.recv(4096).decode("utf-8")
             # Sends image to client
-            if answer == 'GOT SIZE':
-                this_socket.sendall(image_user_input)
-
-                # Checks confirmation from client
-                answer = this_socket.recv(4096).decode("utf-8")
-
-                if answer == "GOT IMAGE":
-                    print("Finished sending!")
-            img.close()
-            screen_shot_count += 1
-        if user_input.find('open') != -1:
-            path = user_input[5:]  # user_input[5:] is supposed to include "{path}"
-            output = open_file(path)  # need to write get_file function that gets a file's path and
-            # tries to open it, returns a proper message if successful or not
-            this_socket.send(bytes(output, "utf-8"))
-        if user_input.find('show') != -1:
+            this_socket.sendall(image_user_input)
+            # Checks confirmation from client
+            answer = this_socket.recv(4096).decode("utf-8")
+            if answer == "got image":
+                img.close()
+        elif user_input.find('open') != -1:
+            path = user_input[5:]
+            open_file(path, this_socket)
+        elif user_input.find('show') != -1:
             folder_path = user_input[5:]
-            content = show_folder_content(folder_path)  # need to write show_folder_content function that returns the
-            if content == "An error has occurred while trying to open the folder, check the path!":
-                this_socket.send(bytes(content, "utf-8"))
-            else:
-                # folder content that's given
-                sub_folder_str = ''
-                for sub_folder in content:
-                    sub_folder_str += f"{sub_folder}\n"
-                this_socket.send(bytes(sub_folder_str, "utf-8"))
+            show_folder_content(folder_path, this_socket)
         try:
             command_menu(this_socket)
             user_input = this_socket.recv(1024).decode("utf-8")
