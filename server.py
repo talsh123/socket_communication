@@ -132,11 +132,11 @@ def handle_connection(this_socket):
             today = date.today().strftime("%d/%m/%Y")
             current_time = datetime.now().strftime("%H:%M:%S")
             this_socket.send(bytes(f"Today's date: {today}\n"
-                                   f"Current time: {current_time}\n", "utf-8"))
+            f"Current time: {current_time}\n", "utf-8"))
         elif user_input == "name":
             this_socket.send(bytes(f"Peer name: {this_socket.getpeername()}\n"
-                                   f"Socket name: {this_socket.getsockname()}\n"
-                                   f"Platform name: {platform.uname()[1]}\n", "utf-8"))
+            f"Socket name: {this_socket.getsockname()}\n"
+            f"Platform name: {platform.uname()[1]}\n", "utf-8"))
         elif user_input == "exit":
             close_connection(this_socket)
         elif user_input == "screen_shot":

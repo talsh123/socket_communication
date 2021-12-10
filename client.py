@@ -3,7 +3,7 @@ import socket
 
 # Define socket
 s = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
-s.connect(('10.0.0.32', 2222))
+s.connect(('10.0.0.18', 2222))
 
 while True:
     data = s.recv(1024).decode("utf-8")
